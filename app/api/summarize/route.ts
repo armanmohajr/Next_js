@@ -1,17 +1,16 @@
-export async function POST(req) {
+import { NextRequest, NextResponse } from "next/server";
+
+export async function POST(req: NextRequest) {
   const { text } = await req.json();
 
   if (!text) {
-    return Response.json({ summary: "No text provided." })
+    return NextResponse.json({ summary: "No text provided." });
   }
 
-  // Simple fake summary (replace with ml model later) 
-
+  // Simple fake summarization logic:
   const words = text.split(" ");
   const summary =
-    words.length > 20
-      ? words.slice(0, 20).json(" ") + "..."
-      : text;
+    words.length > 20 ? words.slice(0, 20).join(" ") + "..." : text;
 
-  return Response.json({ summary })
+  return NextResponse.json({ summary });
 }
