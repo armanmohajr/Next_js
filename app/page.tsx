@@ -8,10 +8,24 @@ export default function Home() {
   const [input, setInput] = useState<string>("");
   const [summary, setSummary] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [length, setLength] = useState<"short" | "medium" | "long">("medium");
+  const [style, setStyle] = useState<"paragraph" | "bullets">("bullets");
 
   const summarizeText = async () => {
     setLoading(true);
+    setError(null);
     setSummary("");
+
+    try {
+      const res = await fetch("/api/summarize", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          body: JSON.stringify({ text: input, length, style })
+        }
+      })
+    }
 
     const res = await fetch("/api/summarize", {
       method: "POST",

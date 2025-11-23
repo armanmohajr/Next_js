@@ -29,16 +29,71 @@ function localFallbackSummarize(text: string, length: Reqbody["length"], style: 
 
 
 export async function POST(req: NextRequest) {
-  const { text } = await req.json();
+  try {
+    const body: Reqbody = await req.json();
 
-  if (!text) {
-    return NextResponse.json({ summary: "No text provided." });
+    const text = (body.text || "").trim();
+    const length = body.length || "medium";
+    const style = body.style || "paragraph";
+
+    if (!text) {
+      return NextResponse.json({ errror: "No text provided." }, { status: 400 })
+    }
+
+    if (text.length > MAX_CHARS) {
+      return NextResponse.json({ error: `Text too long. Max ${MAX_CHARS} characters.` }, { status: 413 });
+    }
+
+    const OPENAI_KEY = process.env.OPENAI_API_KEY;
+
+
+    if (!OPENAI_KEY) {
+      // fallback summarizer when no API key is present
+      const summary = localFallbackSummarize(text, length, style);
+      return NextResponse.json({ summary });
+    }
+
+    // Build a concise promp for summarization
+    const systemPrompt = `You are a concise summarization assistant. Produce a ${length} ${style === "bullets" ? "bullet list" : "paragraph"} summary of the user's text. Keep it short and focused.`;
+
+    const userPrompt = `Text to summarize:\n/n$(text)`;
+
+
+    // call openAi chat Completions
+    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 300,
+        temperature: 0.2,
+      }),
+    });
+
+    if (!openaiRes.ok) {
+      const txt = await openaiRes.text();
+      console.error("OpenAi error:", openaiRes.status, txt);
+      return NextResponse.json({ error: "OpenAi API error" }, { status: 502 });
+    }
+
+    const data = await openaiRes.json();
+    const summary = data?.choices?.[0]?.messages?.content?.trim();
+
+    if (!summary) {
+      return NextResponse.json({ error: "Empty summary" }, { status: 502 });
+    }
+
+    return NextResponse.json({ summary })
+  } catch (err) {
+    console.error("Summarize route error:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 
-  // Simple fake summarization logic:
-  const words = text.split(" ");
-  const summary =
-    words.length > 20 ? words.slice(0, 20).join(" ") + "..." : text;
-
-  return NextResponse.json({ summary });
 }
